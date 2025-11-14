@@ -2,7 +2,10 @@ package nl.devc0n.machinelearning.siepie.game;
 
 import nl.devc0n.machinelearning.siepie.BrowserManager;
 import nl.devc0n.machinelearning.siepie.ai.*;
+import org.deeplearning4j.nn.multilayer.MultiLayerNetwork;
+import org.deeplearning4j.util.ModelSerializer;
 import org.nd4j.linalg.api.ndarray.INDArray;
+import org.nd4j.linalg.dataset.DataSet;
 import org.nd4j.linalg.factory.Nd4j;
 import org.openqa.selenium.By;
 import org.openqa.selenium.WebDriver;
@@ -15,7 +18,11 @@ import javax.imageio.ImageIO;
 import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
+import java.io.File;
 import java.io.IOException;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.Base64;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
@@ -70,29 +77,16 @@ public class GameRunnerService {
         var net = modelFactory.createPolicyNetwork(4, 84, 84, 5);
         var replayBuffer = new ReplayBuffer();
         while (playing) {
-            long t0 = System.currentTimeMillis();
-            stepNumber++;
-
-            BufferedImage[] inputFrames = frameStack.asArray();
-            INDArray state = SupervisedTrainer.imageStackToINDArray(inputFrames);
-
 
             if (isGameOver(driver)) {
 
                 var totalScore = scoreDetection(driver, gameHandler);
-                screenshot = takeScreenshot(driver, clip);
-                resized = resize(screenshot, 84, 84);
-                gray = toGray(resized);
-                frameStack.push(gray);
 
-                BufferedImage[] finalFrames = frameStack.asArray();
-                INDArray finalState = SupervisedTrainer.imageStackToINDArray(finalFrames);
+                trainEpisode(net, replayBuffer, totalScore);
 
-                replayBuffer.add(new Transition(state, 99, totalScore, finalState, true));
-                //todo: train
-
-
-
+                if (episodeNumber % 50 == 0) {
+                    saveNetwork(net);
+                }
 
                 episodeNumber++;
                 stepNumber = 0;
@@ -100,31 +94,78 @@ public class GameRunnerService {
                 replayBuffer.clear();
                 continue;
             }
+            long t0 = System.currentTimeMillis();
+            stepNumber++;
 
-
-            INDArray out = net.output(state);
-            int action = Nd4j.argMax(out, 1).getInt(0);
-            LOG.debug("action number {} performed", action);
-            gameHandler.performAction(action);
-
-
+            // Take a screenshot and feed it to the network.
             screenshot = takeScreenshot(driver, clip);
             resized = resize(screenshot, 84, 84);
             gray = toGray(resized);
             frameStack.push(gray);
+            BufferedImage[] inputFrames = frameStack.asArray();
+            INDArray state = SupervisedTrainer.imageStackToINDArray(inputFrames);
+            INDArray out = net.output(state);
 
-            BufferedImage[] nextFrames = frameStack.asArray();
-            INDArray nextState = SupervisedTrainer.imageStackToINDArray(nextFrames);
-            replayBuffer.add(new Transition(state, action, 0, nextState, false));
+            // get the action with the highest success chance according to the network.
+            int action = Nd4j.argMax(out, 1).getInt(0); //todo: softmax instead of argmax?
+            LOG.debug("action number {} performed", action);
+            gameHandler.performAction(action);
 
 
-            long dt = System.currentTimeMillis() - t0;
+            replayBuffer.add(new Transition(state, action));
+
+
+//            long dt = System.currentTimeMillis() - t0;
 //            LOG.info("inference loop took {} ms", dt);
-            if (dt > 200) {
+//            if (dt > 200) {
 //                LOG.warn("timeloop took longer than 200ms, it was {}ms", dt);
-            }
-            Thread.sleep(Math.max(0, 200 - dt));
+//            }
+//            Thread.sleep(Math.max(0, 200 - dt));
         }
+    }
+
+    public void saveNetwork(MultiLayerNetwork net) {
+        try {
+            DateTimeFormatter formatter2 = DateTimeFormatter.ofPattern("yyy-MM-dd-HH:mm");
+            String formattedString2 = ZonedDateTime.now(ZoneId.of("Europe/Amsterdam")).format(formatter2);
+
+            String filename = "policyNetwork-" + formattedString2 + ".zip";
+            File locationToSave = new File(filename);
+
+            boolean saveUpdater = true; // includes optimizer state (Adam momentum etc.)
+            ModelSerializer.writeModel(net, locationToSave, saveUpdater);
+
+            System.out.println("Saved model: " + filename);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+
+    public void trainEpisode(MultiLayerNetwork network, ReplayBuffer replayBuffer, double finalScore) throws Exception {
+        var transitions = replayBuffer.getBuffer();
+
+        var batchSize = transitions.size();
+        var nActions = 5;
+
+        // Stack states
+        INDArray states = Nd4j.create(batchSize, 4, 84, 84);
+        INDArray labels = Nd4j.zeros(batchSize, nActions);
+        INDArray weights = Nd4j.ones(batchSize).mul(finalScore); // reinforce
+
+        for (int i = 0; i < batchSize; i++) {
+            var t = transitions.get(i);
+
+            states.putRow(i, t.state());
+
+            int action = t.action();
+            labels.putScalar(new int[]{i, action}, 1.0);
+        }
+
+        DataSet ds = new DataSet(states, labels);
+        ds.setLabelsMaskArray(weights); // crucial for REINFORCE
+
+        network.fit(ds);  // single policy update
     }
 
     private boolean isGameOver(ChromeDriver driver) {
