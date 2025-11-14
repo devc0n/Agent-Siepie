@@ -58,13 +58,7 @@ public class GameRunnerService {
         gameHandler.firstStart();
 
         // Capture cropped screenshot
-        Map<String, Integer> clip = Map.of(
-                "x", 125,
-                "y", 230,
-                "width", 250,
-                "height", 300,
-                "scale", 1
-        );
+        Map<String, Integer> clip = Map.of("x", 125, "y", 230, "width", 250, "height", 300, "scale", 1);
 
         var playing = true;
         var stepNumber = 0;
@@ -142,31 +136,42 @@ public class GameRunnerService {
     }
 
 
-    public void trainEpisode(MultiLayerNetwork network, ReplayBuffer replayBuffer, double finalScore) throws Exception {
+    public void trainEpisode(MultiLayerNetwork network, ReplayBuffer replayBuffer, double finalScore) {
         var transitions = replayBuffer.getBuffer();
+        int batchSize = transitions.size();
+        int nActions = 5; // adjust as needed
+        int channels = 4; // number of stacked frames
+        int height = 84;
+        int width = 84;
 
-        var batchSize = transitions.size();
-        var nActions = 5;
+        if (batchSize == 0) return; // nothing to train on
 
-        // Stack states
-        INDArray states = Nd4j.create(batchSize, 4, 84, 84);
+        // Stack all states along the batch dimension
+        INDArray[] stateArrays = transitions.stream()
+                .map(Transition::state)      // each state shape: [1, channels, H, W]
+                .toArray(INDArray[]::new);
+
+        // Concatenate along axis 0 to get shape [batchSize, channels, H, W]
+        INDArray states = Nd4j.concat(0, stateArrays);
+
+        // Create labels (one-hot actions)
         INDArray labels = Nd4j.zeros(batchSize, nActions);
-        INDArray weights = Nd4j.ones(batchSize).mul(finalScore); // reinforce
-
         for (int i = 0; i < batchSize; i++) {
-            var t = transitions.get(i);
-
-            states.putRow(i, t.state());
-
-            int action = t.action();
+            int action = transitions.get(i).action();
             labels.putScalar(new int[]{i, action}, 1.0);
         }
 
-        DataSet ds = new DataSet(states, labels);
-        ds.setLabelsMaskArray(weights); // crucial for REINFORCE
+        // Create label mask to weight the loss by the final score (REINFORCE)
+        INDArray labelMask = Nd4j.ones(batchSize).mul(finalScore);
 
-        network.fit(ds);  // single policy update
+        // Build dataset
+        DataSet ds = new DataSet(states, labels);
+        ds.setLabelsMaskArray(labelMask);
+
+        // Fit network
+        network.fit(ds);
     }
+
 
     private boolean isGameOver(ChromeDriver driver) {
         try {
@@ -178,13 +183,11 @@ public class GameRunnerService {
     }
 
     private BufferedImage takeScreenshot(ChromeDriver driver, Map<String, Integer> clip) throws IOException {
-        var start = System.currentTimeMillis();
         Map<String, Object> result = driver.executeCdpCommand("Page.captureScreenshot", Map.of("clip", clip));
         String base64 = result.get("data").toString();
         byte[] decoded = Base64.getDecoder().decode(base64);
         var screenshot = ImageIO.read(new ByteArrayInputStream(decoded));
 //        Files.write(Path.of("cdp-screenshot.png"), decoded);
-//        LOG.info("Screenshot took {}ms", System.currentTimeMillis() - start);
         return screenshot;
     }
 

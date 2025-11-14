@@ -14,7 +14,7 @@ public class BrowserManager {
     public void startBrowser(int instanceCount) {
         ChromeOptions options = new ChromeOptions();
         options.addArguments("--mute-audio"); // Mute audio
-        options.addArguments("--headless");
+//        options.addArguments("--headless");
         driver = new ChromeDriver(options);
         driver.manage().window().setSize(new Dimension(400, 900));
         driver.executeCdpCommand("Page.enable", Map.of());
