@@ -16,8 +16,8 @@ public class GameController {
     }
 
     @PostMapping("/start")
-    public String start(@RequestParam String url) {
-        gameRunnerService.startGame(url);
+    public String start(@RequestParam String url, @RequestParam boolean save, @RequestParam int numberOfInstances) throws Exception {
+        gameRunnerService.playLoop(1);
         return "Game started at " + url;
     }
 }

@@ -1,3 +1,6 @@
 spring:
   application:
     name: siepie
+logging:
+  level:
+    nl.devc0n.machinelearning: debug
