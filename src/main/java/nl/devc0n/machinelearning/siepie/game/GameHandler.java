@@ -1,6 +1,5 @@
 package nl.devc0n.machinelearning.siepie.game;
 
-import org.apache.juli.logging.LogFactory;
 import org.openqa.selenium.By;
 import org.openqa.selenium.Keys;
 import org.openqa.selenium.WebDriver;
