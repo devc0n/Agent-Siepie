@@ -10,8 +10,6 @@ import org.deeplearning4j.optimize.listeners.ScoreIterationListener;
 import org.nd4j.linalg.activations.Activation;
 import org.nd4j.linalg.api.ndarray.INDArray;
 import org.nd4j.linalg.factory.Nd4j;
-import org.nd4j.linalg.indexing.INDArrayIndex;
-import org.nd4j.linalg.indexing.NDArrayIndex;
 import org.nd4j.linalg.learning.config.Adam;
 import org.nd4j.linalg.lossfunctions.LossFunctions;
 
@@ -119,7 +117,7 @@ public class DQNNetwork {
             INDArray target = currentQ.dup();
             target.putScalar(new int[]{0, step.getAction().index}, targetQ); // Note: [0, action_index] for batch
 
-            statesList.add(step.getFrameStack());
+            statesList.add(step.getFrameStack().reshape(1,4,84,84));
             targetsList.add(target.getRow(0)); // Remove batch dimension from target
         }
 

@@ -16,7 +16,7 @@ public class GameStep {
         this.nextFrameStack = nextFrameStack;
         this.stepNumber = stepNumber;
         this.terminal = false;
-        this.reward = 0.01f; // Default survival bonus
+        this.reward = 1; // Default survival bonus
     }
 
     // Getters and setters

@@ -3,31 +3,26 @@ package nl.devc0n.machinelearning.siepie.memory;
 import nl.devc0n.machinelearning.siepie.model.Episode;
 import nl.devc0n.machinelearning.siepie.model.GameStep;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Random;
+import java.util.*;
 
 public class ReplayBuffer {
-    private List<Episode> episodes;
-    private int maxEpisodes;
-    private Random random;
+
+    private final Deque<Episode> episodes = new ArrayDeque<>();
+    private final int maxEpisodes;
+    private final Random random = new Random();
 
     public ReplayBuffer(int maxEpisodes) {
-        this.episodes = new ArrayList<>();
         this.maxEpisodes = maxEpisodes;
-        this.random = new Random();
     }
 
     public ReplayBuffer() {
-        this(100); // Default: keep last 100 episodes
+        this(1000); // Default: keep last 100 episodes
     }
 
     public void addEpisode(Episode episode) {
-        episodes.add(episode);
-
-        // Remove oldest episodes if buffer too large
+        episodes.addLast(episode);
         while (episodes.size() > maxEpisodes) {
-            episodes.remove(0);
+            episodes.removeFirst(); // Remove oldest
         }
     }
 

@@ -1,12 +1,16 @@
 package nl.devc0n.machinelearning.siepie;
 
 import nl.devc0n.machinelearning.siepie.agent.AgentSiepie;
+import nl.devc0n.machinelearning.siepie.memory.ReplayBuffer;
 import nl.devc0n.machinelearning.siepie.model.Action;
 import nl.devc0n.machinelearning.siepie.model.Episode;
 import nl.devc0n.machinelearning.siepie.model.FrameStack;
+import nl.devc0n.machinelearning.siepie.parallel.ParallelTraining;
 import org.nd4j.linalg.api.ndarray.INDArray;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+import java.io.IOException;
 
 @SpringBootApplication
 public class SiepieApplication {
@@ -14,14 +18,31 @@ public class SiepieApplication {
     public static void main(String[] args) throws Exception {
         SpringApplication.run(SiepieApplication.class, args);
 
-        AgentSiepie agent = new AgentSiepie();
+        int numBrowsers = 4;
+        System.out.println("Starting parallel training with " + numBrowsers + " browsers");
 
-        // Optional: Load previous checkpoint
-        // try {
-        //     agent.load("models/checkpoint.zip");
-        // } catch (IOException e) {
-        //     System.out.println("Starting fresh training");
-        // }
+        // Create and start parallel training
+        ParallelTraining training = new ParallelTraining(numBrowsers);
+
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            System.out.println("\nShutdown signal received...");
+            training.stop();
+        }));
+
+        // Start training
+        training.start();
+
+
+
+        ReplayBuffer sharedReplayBuffer = new ReplayBuffer(1000);
+        AgentSiepie agent = new AgentSiepie(sharedReplayBuffer);
+
+//         Optional: Load previous checkpoint
+         try {
+             agent.load("src/main/resources/models/checkpoint_530.zip");
+         } catch (IOException e) {
+             System.out.println("Starting fresh training");
+         }
 
         int maxEpisodes = 1000;
 

@@ -29,13 +29,13 @@ public class AgentSiepie {
     private static final int TRAIN_FREQUENCY = 100;
     private static final int MIN_BUFFER_SIZE = 500;
 
-    public AgentSiepie() {
+    public AgentSiepie(ReplayBuffer replayBuffer) {
         this.network = new DQNNetwork();
-        this.replayBuffer = new ReplayBuffer();
         this.rewardShaper = new RewardShaper();
         this.epsilon = EPSILON_START;
         this.totalSteps = 0;
         this.episodeCount = 0;
+        this.replayBuffer = replayBuffer;
     }
 
     public void startEpisode() {
