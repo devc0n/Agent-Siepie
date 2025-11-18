@@ -1,15 +1,16 @@
 package nl.devc0n.machinelearning.siepie;
 
+import lombok.extern.slf4j.Slf4j;
 import nl.devc0n.machinelearning.siepie.model.Action;
 import org.openqa.selenium.By;
 import org.openqa.selenium.Dimension;
 import org.openqa.selenium.Keys;
+import org.openqa.selenium.WebElement;
 import org.openqa.selenium.chrome.ChromeDriver;
 import org.openqa.selenium.chrome.ChromeOptions;
+import org.openqa.selenium.interactions.Actions;
 import org.openqa.selenium.support.ui.ExpectedConditions;
 import org.openqa.selenium.support.ui.WebDriverWait;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import javax.imageio.ImageIO;
 import java.awt.*;
@@ -21,14 +22,21 @@ import java.time.Duration;
 import java.util.Base64;
 import java.util.Map;
 
+@Slf4j
 public class BrowserManager {
 
     private ChromeDriver driver;
     private WebDriverWait wait;
-
-    private final Map<String, Integer> clip = Map.of("x", 100, "y", 230, "width", 300, "height", 300, "scale", 1);
-
-    private final Logger LOG = LoggerFactory.getLogger(BrowserManager.class);
+    private Actions actions;
+    private final Map<String, Object> params = Map.of(
+            "clip", Map.of(
+                    "x", 75,
+                    "y", 230,
+                    "width", 350,
+                    "height", 350,
+                    "scale", 1),
+            "format", "jpeg",
+            "quality", 80);
 
 
     public void startBrowser() {
@@ -36,7 +44,7 @@ public class BrowserManager {
         options.addArguments("--mute-audio"); // Mute audio
 
         // Optional: Run headless (no UI) for faster execution
-        // options.addArguments("--headless");
+         options.addArguments("--headless");
 
         driver = new ChromeDriver(options);
         driver.manage().window().setSize(new Dimension(400, 900));
@@ -50,35 +58,29 @@ public class BrowserManager {
 
         var allowCookiesButton = wait.until(ExpectedConditions.presenceOfElementLocated(By.id("CybotCookiebotDialogBodyLevelButtonLevelOptinAllowAll")));
         allowCookiesButton.click();
-        LOG.debug("Allow cookies button was clicked");
+        log.debug("Allow cookies button was clicked");
 
         var playButton = wait.until(ExpectedConditions.presenceOfElementLocated(By.className("launch-button")));
         playButton.click();
-        LOG.debug("Play button was clicked");
+        log.debug("Play button was clicked");
 
         var closeButton = wait.until(ExpectedConditions.presenceOfElementLocated(By.className("close")));
         closeButton.click();
-        LOG.debug("Close button was clicked");
+        log.debug("Close button was clicked");
+
+        actions = new Actions(driver);
     }
 
-    public void performAction(Action action) throws InterruptedException {
+    public void performAction(Action action) {
+        var start = System.currentTimeMillis();
         switch (action) {
-            case NOTHING:
-                return;
-            case UP:
-                driver.findElement(By.tagName("body")).sendKeys(Keys.ARROW_UP);
-                return;
-            case LEFT:
-                driver.findElement(By.tagName("body")).sendKeys(Keys.ARROW_LEFT);
-                return;
-            case RIGHT:
-                driver.findElement(By.tagName("body")).sendKeys(Keys.ARROW_RIGHT);
-                return;
-            case DOWN:
-                driver.findElement(By.tagName("body")).sendKeys(Keys.ARROW_DOWN);
-                return;
-            default:
+            case UP -> actions.sendKeys(Keys.ARROW_UP).perform();
+            case LEFT -> actions.sendKeys(Keys.ARROW_LEFT).perform();
+            case RIGHT -> actions.sendKeys(Keys.ARROW_RIGHT).perform();
+            case DOWN -> actions.sendKeys(Keys.ARROW_DOWN).perform();
+            case NOTHING -> {}
         }
+        log.debug("Performing action took: {}ms", System.currentTimeMillis() - start);
     }
 
     public void restartGame() throws InterruptedException {
@@ -118,18 +120,22 @@ public class BrowserManager {
     }
 
     public BufferedImage takeScreenshot() throws IOException {
-        Map<String, Object> result = driver.executeCdpCommand("Page.captureScreenshot", Map.of("clip", clip));
+        var start = System.currentTimeMillis();
+        Map<String, Object> result =
+                driver.executeCdpCommand("Page.captureScreenshot", params);
+
         String base64 = result.get("data").toString();
         byte[] decoded = Base64.getDecoder().decode(base64);
         var screenshot = ImageIO.read(new ByteArrayInputStream(decoded));
-//        File outputfile = new File("src/main/resources/screenshots/" + System.currentTimeMillis() + "-original.png");
-//        ImageIO.write(screenshot, "png", outputfile);
-        return resizeAndGrayscale(screenshot, 84, 84, false);
+
+        var output = resize(screenshot, 128, 128, false);
+
+        log.debug("Screenshot capture duration: {}", System.currentTimeMillis() - start);
+        return output;
     }
 
-    private BufferedImage resizeAndGrayscale(BufferedImage src, int targetW, int targetH, boolean highQuality) throws IOException {
-        //todo: see difference in timing with highQuality
-        BufferedImage out = new BufferedImage(targetW, targetH, BufferedImage.TYPE_BYTE_GRAY);
+    private BufferedImage resize(BufferedImage src, int targetW, int targetH, boolean highQuality) throws IOException {
+        BufferedImage out = new BufferedImage(targetW, targetH, BufferedImage.TYPE_INT_RGB);
         Graphics2D g = out.createGraphics();
 
         if (highQuality) {
@@ -144,9 +150,8 @@ public class BrowserManager {
         g.drawImage(src, 0, 0, targetW, targetH, null);
         g.dispose();
 
-//        File outputfile = new File("src/main/resources/screenshots/" + System.currentTimeMillis() + "-proc.png");
-//        ImageIO.write(out, "png", outputfile);
-
+        File outputfile = new File("src/main/resources/screenshots/" + System.currentTimeMillis() + "-proc.png");
+        ImageIO.write(out, "png", outputfile);
         return out;
     }
 

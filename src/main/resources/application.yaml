@@ -3,4 +3,4 @@ spring:
     name: siepie
 logging:
   level:
-    nl.devc0n.machinelearning: debug
+    nl.devc0n.machinelearning: info

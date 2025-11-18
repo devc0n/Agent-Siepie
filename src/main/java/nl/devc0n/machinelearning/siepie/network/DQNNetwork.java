@@ -23,9 +23,11 @@ public class DQNNetwork {
     private MultiLayerNetwork model;
     private MultiLayerNetwork targetModel;
 
-    private static final int INPUT_HEIGHT = 84;
-    private static final int INPUT_WIDTH = 84;
+    private static final int INPUT_HEIGHT = 128;
+    private static final int INPUT_WIDTH = 128;
+    private static final int CHANNELS = 3; // RGB
     private static final int FRAME_STACK = 4;
+    private static final int INPUT_CHANNELS = CHANNELS * FRAME_STACK; // 12 total channels
     private static final double LEARNING_RATE = 0.00025;
     private static final double GAMMA = 0.99;
 
@@ -42,7 +44,7 @@ public class DQNNetwork {
                 .updater(new Adam(LEARNING_RATE))
                 .list()
                 .layer(new ConvolutionLayer.Builder(8, 8)
-                        .nIn(FRAME_STACK)
+                        .nIn(INPUT_CHANNELS) // 12 channels (4 frames × 3 RGB)
                         .stride(4, 4)
                         .nOut(32)
                         .activation(Activation.RELU)
@@ -66,7 +68,7 @@ public class DQNNetwork {
                         .activation(Activation.IDENTITY)
                         .build())
                 .setInputType(org.deeplearning4j.nn.conf.inputs.InputType.convolutional(
-                        INPUT_HEIGHT, INPUT_WIDTH, FRAME_STACK))
+                        INPUT_HEIGHT, INPUT_WIDTH, INPUT_CHANNELS))
                 .build();
 
         model = new MultiLayerNetwork(conf);
@@ -85,7 +87,7 @@ public class DQNNetwork {
             return Action.fromIndex(1 + (int)(Math.random() * 4));
         }
 
-        INDArray batchedInput = frameStack.reshape(1, FRAME_STACK, INPUT_HEIGHT, INPUT_WIDTH);
+        INDArray batchedInput = frameStack.reshape(1, INPUT_CHANNELS, INPUT_HEIGHT, INPUT_WIDTH);
         INDArray qValues = model.output(batchedInput);
 
         int bestAction = Nd4j.argMax(qValues, 1).getInt(0);
@@ -101,27 +103,27 @@ public class DQNNetwork {
 
         for (GameStep step : batch) {
             // Add batch dimension for forward pass
-            INDArray batchedFrame = step.getFrameStack().reshape(1, FRAME_STACK, INPUT_HEIGHT, INPUT_WIDTH);
+            INDArray batchedFrame = step.getFrameStack().reshape(1, INPUT_CHANNELS, INPUT_HEIGHT, INPUT_WIDTH);
             INDArray currentQ = model.output(batchedFrame);
 
             float targetQ;
             if (step.isTerminal()) {
                 targetQ = step.getReward();
             } else {
-                INDArray batchedNextFrame = step.getNextFrameStack().reshape(1, FRAME_STACK, INPUT_HEIGHT, INPUT_WIDTH);
+                INDArray batchedNextFrame = step.getNextFrameStack().reshape(1, INPUT_CHANNELS, INPUT_HEIGHT, INPUT_WIDTH);
                 INDArray nextQ = targetModel.output(batchedNextFrame);
                 float maxNextQ = nextQ.maxNumber().floatValue();
                 targetQ = step.getReward() + (float)GAMMA * maxNextQ;
             }
 
             INDArray target = currentQ.dup();
-            target.putScalar(new int[]{0, step.getAction().index}, targetQ); // Note: [0, action_index] for batch
+            target.putScalar(new int[]{0, step.getAction().index}, targetQ);
 
-            statesList.add(step.getFrameStack().reshape(1,4,84,84));
+            statesList.add(step.getFrameStack().reshape(1, INPUT_CHANNELS, INPUT_HEIGHT, INPUT_WIDTH));
             targetsList.add(target.getRow(0)); // Remove batch dimension from target
         }
 
-        // Stack into batches - this will create [batchSize, K, H, W]
+        // Stack into batches - this will create [batchSize, C, H, W]
         INDArray states = Nd4j.vstack(statesList.toArray(new INDArray[0]));
         INDArray targets = Nd4j.vstack(targetsList.toArray(new INDArray[0]));
 

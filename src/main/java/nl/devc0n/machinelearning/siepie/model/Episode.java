@@ -1,13 +1,13 @@
 package nl.devc0n.machinelearning.siepie.model;
 
-
+import lombok.Getter;
 
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 
-public class Episode implements Comparable<Episode> {
-    private List<GameStep> steps;
+@Getter
+public class Episode {
+    private final List<GameStep> steps;
     private int finalScore;
     private int episodeLength;
 
@@ -22,29 +22,16 @@ public class Episode implements Comparable<Episode> {
     public void finish(int finalScore) {
         this.finalScore = finalScore;
 
-        var framesToDelete = 13;
-        if (steps.size() < framesToDelete){
-            if (steps.size() > 5){
-                framesToDelete = steps.size() - 5;
-            }else{
-                framesToDelete = steps.size();
-            }
+        var framesToDelete = 16;
+        int minStepsRequired = 5;
+
+        // Only delete if we have more than the minimum required
+        if (steps.size() > minStepsRequired) {
+            // Delete up to 16 frames, but keep at least 5
+            int actualDeleteCount = Math.min(framesToDelete, steps.size() - minStepsRequired);
+            steps.subList(steps.size() - actualDeleteCount, steps.size()).clear();
         }
-        // removes dead screen steps
-        for (int i = 0; i < framesToDelete; i++) {
-            int index = steps.size() -1;
-            steps.remove(index);
-        }
+
         this.episodeLength = steps.size();
-    }
-
-    // Getters
-    public List<GameStep> getSteps() { return steps; }
-    public int getFinalScore() { return finalScore; }
-    public int getEpisodeLength() { return episodeLength; }
-
-    @Override
-    public int compareTo(Episode o) {
-        return Integer.compare(this.finalScore, o.finalScore);
     }
 }

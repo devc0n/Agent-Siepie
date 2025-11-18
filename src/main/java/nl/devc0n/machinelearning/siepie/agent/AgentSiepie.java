@@ -1,5 +1,6 @@
 package nl.devc0n.machinelearning.siepie.agent;
 
+import lombok.extern.slf4j.Slf4j;
 import nl.devc0n.machinelearning.siepie.memory.ReplayBuffer;
 import nl.devc0n.machinelearning.siepie.model.Action;
 import nl.devc0n.machinelearning.siepie.model.Episode;
@@ -11,7 +12,9 @@ import org.nd4j.linalg.api.ndarray.INDArray;
 import java.io.IOException;
 import java.util.List;
 
+@Slf4j
 public class AgentSiepie {
+
     private DQNNetwork network;
     private ReplayBuffer replayBuffer;
     private RewardShaper rewardShaper;
@@ -101,8 +104,19 @@ public class AgentSiepie {
     }
 
     // Getters for monitoring
-    public double getEpsilon() { return epsilon; }
-    public int getTotalSteps() { return totalSteps; }
-    public int getEpisodeCount() { return episodeCount; }
-    public int getBufferSize() { return replayBuffer.getTotalSteps(); }
+    public double getEpsilon() {
+        return epsilon;
+    }
+
+    public int getTotalSteps() {
+        return totalSteps;
+    }
+
+    public int getEpisodeCount() {
+        return episodeCount;
+    }
+
+    public int getBufferSize() {
+        return replayBuffer.getTotalSteps();
+    }
 }

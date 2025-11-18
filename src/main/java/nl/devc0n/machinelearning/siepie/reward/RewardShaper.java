@@ -12,7 +12,7 @@ import java.io.IOException;
 public class RewardShaper {
     private static final float SURVIVAL_BONUS = 0.01f;
     private static final float DEATH_PENALTY = -1.0f;
-    private static final int TERMINAL_WINDOW = 5;
+    private static final int TERMINAL_WINDOW = 3;
 
     /**
      * After death detected, mark the last N frames as terminal states
