@@ -30,6 +30,7 @@ public class DQNNetwork {
     private static final int INPUT_CHANNELS = CHANNELS * FRAME_STACK; // 12 total channels
     private static final double LEARNING_RATE = 0.00025;
     private static final double GAMMA = 0.99;
+    private int trainingIterations = 0;
 
     public DQNNetwork() {
         buildNetwork();
@@ -128,6 +129,12 @@ public class DQNNetwork {
         INDArray targets = Nd4j.vstack(targetsList.toArray(new INDArray[0]));
 
         model.fit(states, targets);
+
+        // Log loss every 100 training iterations
+        if (trainingIterations++ % 100 == 0) {
+            double loss = model.score();
+            System.out.printf("Training iteration %d, Loss: %.4f%n", trainingIterations, loss);
+        }
     }
 
     public void updateTargetNetwork() {

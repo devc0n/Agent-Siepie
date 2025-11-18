@@ -26,10 +26,10 @@ public class AgentSiepie {
     // Hyperparameters
     private static final double EPSILON_START = 1.0;
     private static final double EPSILON_DECAY = 0.995;
-    private static final double EPSILON_MIN = 0.1;
+    private static final double EPSILON_MIN = 0.01;
     private static final int BATCH_SIZE = 64;
     private static final int TARGET_UPDATE_FREQUENCY = 2000;
-    private static final int TRAIN_FREQUENCY = 100;
+    private static final int TRAIN_FREQUENCY = 50;
     private static final int MIN_BUFFER_SIZE = 500;
 
     public AgentSiepie(ReplayBuffer replayBuffer) {
