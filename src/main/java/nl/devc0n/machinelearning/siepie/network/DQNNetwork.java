@@ -2,8 +2,11 @@ package nl.devc0n.machinelearning.siepie.network;
 
 import nl.devc0n.machinelearning.siepie.model.Action;
 import nl.devc0n.machinelearning.siepie.model.GameStep;
+import org.deeplearning4j.nn.conf.GradientNormalization;
 import org.deeplearning4j.nn.conf.NeuralNetConfiguration;
-import org.deeplearning4j.nn.conf.layers.*;
+import org.deeplearning4j.nn.conf.layers.ConvolutionLayer;
+import org.deeplearning4j.nn.conf.layers.DenseLayer;
+import org.deeplearning4j.nn.conf.layers.OutputLayer;
 import org.deeplearning4j.nn.multilayer.MultiLayerNetwork;
 import org.deeplearning4j.nn.weights.WeightInit;
 import org.deeplearning4j.optimize.listeners.ScoreIterationListener;
@@ -18,19 +21,17 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
+import static org.nd4j.graph.UIEventSubtype.LEARNING_RATE;
+
 
 public class DQNNetwork {
+    private static final int INPUT_HEIGHT = 84;
+    private static final int INPUT_WIDTH = 84;
+    private static final int FRAME_STACK = 4;
+    private static final double GAMMA = 0.99;
     private MultiLayerNetwork model;
     private MultiLayerNetwork targetModel;
-
-    private static final int INPUT_HEIGHT = 128;
-    private static final int INPUT_WIDTH = 128;
-    private static final int CHANNELS = 3; // RGB
-    private static final int FRAME_STACK = 4;
-    private static final int INPUT_CHANNELS = CHANNELS * FRAME_STACK; // 12 total channels
-    private static final double LEARNING_RATE = 0.00025;
-    private static final double GAMMA = 0.99;
-    private int trainingIterations = 0;
+    private final int trainingIterations = 0;
 
     public DQNNetwork() {
         buildNetwork();
@@ -41,11 +42,13 @@ public class DQNNetwork {
 
         var conf = new NeuralNetConfiguration.Builder()
                 .seed(123)
-                .weightInit(WeightInit.XAVIER)
                 .updater(new Adam(LEARNING_RATE))
+                .weightInit(WeightInit.XAVIER)
+                .gradientNormalization(GradientNormalization.ClipElementWiseAbsoluteValue)
+                .gradientNormalizationThreshold(1.0)
                 .list()
                 .layer(new ConvolutionLayer.Builder(8, 8)
-                        .nIn(INPUT_CHANNELS) // 12 channels (4 frames × 3 RGB)
+                        .nIn(FRAME_STACK)
                         .stride(4, 4)
                         .nOut(32)
                         .activation(Activation.RELU)
@@ -69,7 +72,7 @@ public class DQNNetwork {
                         .activation(Activation.IDENTITY)
                         .build())
                 .setInputType(org.deeplearning4j.nn.conf.inputs.InputType.convolutional(
-                        INPUT_HEIGHT, INPUT_WIDTH, INPUT_CHANNELS))
+                        INPUT_HEIGHT, INPUT_WIDTH, FRAME_STACK))
                 .build();
 
         model = new MultiLayerNetwork(conf);
@@ -85,10 +88,11 @@ public class DQNNetwork {
             if (Math.random() < 0.5) {
                 return Action.NOTHING;
             }
-            return Action.fromIndex(1 + (int)(Math.random() * 4));
+            return Action.fromIndex(1 + (int) (Math.random() * 4));
         }
 
-        INDArray batchedInput = frameStack.reshape(1, INPUT_CHANNELS, INPUT_HEIGHT, INPUT_WIDTH);
+        // Add batch dimension: [K, H, W] -> [1, K, H, W]
+        INDArray batchedInput = frameStack.reshape(1, FRAME_STACK, INPUT_HEIGHT, INPUT_WIDTH);
         INDArray qValues = model.output(batchedInput);
 
         int bestAction = Nd4j.argMax(qValues, 1).getInt(0);
@@ -103,38 +107,34 @@ public class DQNNetwork {
         List<INDArray> targetsList = new ArrayList<>();
 
         for (GameStep step : batch) {
-            // Add batch dimension for forward pass
-            INDArray batchedFrame = step.getFrameStack().reshape(1, INPUT_CHANNELS, INPUT_HEIGHT, INPUT_WIDTH);
+            // Add batch dimension for forward pass: [K, H, W] -> [1, K, H, W]
+            INDArray batchedFrame = step.getFrameStack().reshape(1, FRAME_STACK, INPUT_HEIGHT, INPUT_WIDTH);
             INDArray currentQ = model.output(batchedFrame);
 
             float targetQ;
             if (step.isTerminal()) {
                 targetQ = step.getReward();
             } else {
-                INDArray batchedNextFrame = step.getNextFrameStack().reshape(1, INPUT_CHANNELS, INPUT_HEIGHT, INPUT_WIDTH);
+                INDArray batchedNextFrame = step.getNextFrameStack().reshape(1, FRAME_STACK, INPUT_HEIGHT, INPUT_WIDTH);
                 INDArray nextQ = targetModel.output(batchedNextFrame);
                 float maxNextQ = nextQ.maxNumber().floatValue();
-                targetQ = step.getReward() + (float)GAMMA * maxNextQ;
+                targetQ = step.getReward() + (float) GAMMA * maxNextQ;
             }
 
             INDArray target = currentQ.dup();
             target.putScalar(new int[]{0, step.getAction().index}, targetQ);
 
-            statesList.add(step.getFrameStack().reshape(1, INPUT_CHANNELS, INPUT_HEIGHT, INPUT_WIDTH));
-            targetsList.add(target.getRow(0)); // Remove batch dimension from target
+            // Store WITH proper shape for stacking
+            // Ensure frameStack maintains 4D shape [1, K, H, W] for proper vstacking
+            statesList.add(step.getFrameStack().reshape(1, FRAME_STACK, INPUT_HEIGHT, INPUT_WIDTH));
+            targetsList.add(target.getRow(0)); // Remove batch dimension
         }
 
-        // Stack into batches - this will create [batchSize, C, H, W]
-        INDArray states = Nd4j.vstack(statesList.toArray(new INDArray[0]));
+
+        INDArray states = Nd4j.concat(0, statesList.toArray(new INDArray[0]));
         INDArray targets = Nd4j.vstack(targetsList.toArray(new INDArray[0]));
 
         model.fit(states, targets);
-
-        // Log loss every 100 training iterations
-        if (trainingIterations++ % 100 == 0) {
-            double loss = model.score();
-            System.out.printf("Training iteration %d, Loss: %.4f%n", trainingIterations, loss);
-        }
     }
 
     public void updateTargetNetwork() {

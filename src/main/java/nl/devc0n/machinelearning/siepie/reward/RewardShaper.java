@@ -4,15 +4,19 @@ import nl.devc0n.machinelearning.siepie.model.Episode;
 import nl.devc0n.machinelearning.siepie.model.GameStep;
 import org.nd4j.linalg.api.ndarray.INDArray;
 
-import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
-import java.io.File;
-import java.io.IOException;
 
 public class RewardShaper {
     private static final float SURVIVAL_BONUS = 0.01f;
     private static final float DEATH_PENALTY = -10.0f;
     private static final int TERMINAL_WINDOW = 3;
+
+    public void applyRewards(Episode episode) {
+        markTerminalStates(episode);
+        for (var step : episode.getSteps()) {
+            step.setReward(calculateReward(step.isTerminal()));
+        }
+    }
 
     /**
      * After death detected, mark the last N frames as terminal states
@@ -39,13 +43,10 @@ public class RewardShaper {
 //            }catch (Exception e){
 //                System.out.println("getting image went wrong");
 //            }
-
-
-
         }
     }
 
-    private  BufferedImage[] framesFromINDArray(INDArray arr) {
+    private BufferedImage[] framesFromINDArray(INDArray arr) {
         int K = (int) arr.size(0);
         int H = (int) arr.size(1);
         int W = (int) arr.size(2);
@@ -69,4 +70,28 @@ public class RewardShaper {
         return images;
     }
 
+    private float calculateReward(int currentStep, boolean gameOver, int episodeSteps) {
+        if (gameOver) {
+            // Proportionele penalty: hoe eerder dood, hoe erger
+            float survivalRatio = (float) episodeSteps / 500.0f; // 500 = target
+            return -50.0f * (1.0f - survivalRatio);
+            // Dood op step 100: -40
+            // Dood op step 300: -20
+            // Dood op step 450: -5
+        }
+
+        // Quadratische groei voor late game
+        if (currentStep > 300) {
+            return 5.0f + (currentStep - 300) * 0.05f; // Extra bonus late game
+        }
+
+        return 1.0f + (currentStep * 0.01f);
+    }
+
+    private float calculateReward(boolean gameOver) {
+        if (gameOver) {
+            return -1.0f;  // Simpele death penalty
+        }
+        return 0.1f;  // Elke step = +0.1 (zoals origineel)
+    }
 }

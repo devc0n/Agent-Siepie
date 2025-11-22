@@ -13,6 +13,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import static nl.devc0n.machinelearning.siepie.SiepieApplication.saveFrameStackMontage;
+
 public class ParallelTraining {
 
     private final AgentSiepie agent;
@@ -87,8 +89,9 @@ public class ParallelTraining {
                 }
 
                 if (died) {
+                    saveFrameStackMontage(state, "S:\\Development\\siepie\\screenshots\\montage_ep42_step100.png");
                     int finalScore = browserManager.extractFinalScore();
-                    agent.endEpisode(episode, finalScore);
+                    agent.endEpisode(episode, finalScore, 0);
 
                     browserManager.restartGame();
                     episodesCompleted++;

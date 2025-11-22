@@ -5,7 +5,6 @@ import nl.devc0n.machinelearning.siepie.model.Action;
 import org.openqa.selenium.By;
 import org.openqa.selenium.Dimension;
 import org.openqa.selenium.Keys;
-import org.openqa.selenium.WebElement;
 import org.openqa.selenium.chrome.ChromeDriver;
 import org.openqa.selenium.chrome.ChromeOptions;
 import org.openqa.selenium.interactions.Actions;
@@ -16,7 +15,6 @@ import javax.imageio.ImageIO;
 import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
-import java.io.File;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.Base64;
@@ -25,9 +23,6 @@ import java.util.Map;
 @Slf4j
 public class BrowserManager {
 
-    private ChromeDriver driver;
-    private WebDriverWait wait;
-    private Actions actions;
     private final Map<String, Object> params = Map.of(
             "clip", Map.of(
                     "x", 75,
@@ -37,14 +32,16 @@ public class BrowserManager {
                     "scale", 1),
             "format", "jpeg",
             "quality", 80);
-
+    private ChromeDriver driver;
+    private WebDriverWait wait;
+    private Actions actions;
 
     public void startBrowser() {
         ChromeOptions options = new ChromeOptions();
         options.addArguments("--mute-audio"); // Mute audio
 
         // Optional: Run headless (no UI) for faster execution
-         options.addArguments("--headless");
+        options.addArguments("--headless");
 
         driver = new ChromeDriver(options);
         driver.manage().window().setSize(new Dimension(400, 900));
@@ -78,7 +75,8 @@ public class BrowserManager {
             case LEFT -> actions.sendKeys(Keys.ARROW_LEFT).perform();
             case RIGHT -> actions.sendKeys(Keys.ARROW_RIGHT).perform();
             case DOWN -> actions.sendKeys(Keys.ARROW_DOWN).perform();
-            case NOTHING -> {}
+            case NOTHING -> {
+            }
         }
         log.debug("Performing action took: {}ms", System.currentTimeMillis() - start);
     }
@@ -128,30 +126,24 @@ public class BrowserManager {
         byte[] decoded = Base64.getDecoder().decode(base64);
         var screenshot = ImageIO.read(new ByteArrayInputStream(decoded));
 
-        var output = resize(screenshot, 128, 128, false);
+        var output = preProcess(screenshot, 84, 84);
 
         log.debug("Screenshot capture duration: {}", System.currentTimeMillis() - start);
         return output;
     }
 
-    private BufferedImage resize(BufferedImage src, int targetW, int targetH, boolean highQuality) throws IOException {
-        BufferedImage out = new BufferedImage(targetW, targetH, BufferedImage.TYPE_INT_RGB);
+    private BufferedImage preProcess(BufferedImage src, int targetW, int targetH) throws IOException {
+        BufferedImage out = new BufferedImage(targetW, targetH, BufferedImage.TYPE_BYTE_GRAY);
         Graphics2D g = out.createGraphics();
 
-        if (highQuality) {
-            g.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
-                    RenderingHints.VALUE_INTERPOLATION_BILINEAR);
-        } else {
-            // Faster but lower quality
-            g.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
-                    RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
-        }
+        g.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
+                RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
 
         g.drawImage(src, 0, 0, targetW, targetH, null);
         g.dispose();
 
-        File outputfile = new File("src/main/resources/screenshots/" + System.currentTimeMillis() + "-proc.png");
-        ImageIO.write(out, "png", outputfile);
+//        File outputfile = new File("src/main/resources/screenshots/" + System.currentTimeMillis() + "-proc.png");
+//        ImageIO.write(out, "png", outputfile);
         return out;
     }
 

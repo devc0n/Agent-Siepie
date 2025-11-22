@@ -1,5 +1,6 @@
 package nl.devc0n.machinelearning.siepie.agent;
 
+import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import nl.devc0n.machinelearning.siepie.memory.ReplayBuffer;
 import nl.devc0n.machinelearning.siepie.model.Action;
@@ -15,22 +16,25 @@ import java.util.List;
 @Slf4j
 public class AgentSiepie {
 
-    private DQNNetwork network;
-    private ReplayBuffer replayBuffer;
-    private RewardShaper rewardShaper;
-
-    private double epsilon;
-    private int totalSteps;
-    private int episodeCount;
-
     // Hyperparameters
-    private static final double EPSILON_START = 1.0;
-    private static final double EPSILON_DECAY = 0.995;
-    private static final double EPSILON_MIN = 0.01;
-    private static final int BATCH_SIZE = 64;
-    private static final int TARGET_UPDATE_FREQUENCY = 2000;
-    private static final int TRAIN_FREQUENCY = 50;
-    private static final int MIN_BUFFER_SIZE = 500;
+    // Training config
+    private static final int BATCH_SIZE = 64;  // Was dit misschien 32?
+    private static final int TRAIN_FREQUENCY = 50;  // Niet te vaak
+    private static final int TARGET_UPDATE_FREQUENCY = 2000;  // Terug naar origineel
+    // Epsilon decay
+    private static final double EPSILON_START = 0.30;
+    private static final double EPSILON_END = 0.05;
+    private static final int EPSILON_DECAY_EPISODES = 1000;
+    private final DQNNetwork network;
+    private final ReplayBuffer replayBuffer;
+    private final RewardShaper rewardShaper;
+    // Getters for monitoring
+    @Getter
+    private double epsilon;
+    @Getter
+    private int totalSteps;
+    @Getter
+    private int episodeCount;
 
     public AgentSiepie(ReplayBuffer replayBuffer) {
         this.network = new DQNNetwork();
@@ -59,7 +63,7 @@ public class AgentSiepie {
 
         // Train periodically
         if (totalSteps % TRAIN_FREQUENCY == 0 &&
-                replayBuffer.getTotalSteps() >= MIN_BUFFER_SIZE) {
+                replayBuffer.getTotalSteps() >= BATCH_SIZE) {
             List<GameStep> batch = replayBuffer.sampleBatch(BATCH_SIZE);
             network.train(batch);
         }
@@ -71,27 +75,18 @@ public class AgentSiepie {
         }
     }
 
-    public void endEpisode(Episode episode, int finalScore) {
+    public void endEpisode(Episode episode, int finalScore, int episodeNum) {
         episode.finish(finalScore);
 
+
         // Mark last 5 frames as terminal states with death penalty
-        rewardShaper.markTerminalStates(episode);
+        rewardShaper.applyRewards(episode);
 
         // Add to replay buffer
         replayBuffer.addEpisode(episode);
 
         // Decay exploration rate
-        epsilon = Math.max(EPSILON_MIN, epsilon * EPSILON_DECAY);
-
-        // Log progress
-        System.out.printf(
-                "%-10d %-10d %-10d %-10.3f %-15d%n",
-                episodeCount,
-                finalScore,
-                episode.getSteps().size(),
-                epsilon,
-                replayBuffer.getEpisodeCount()
-        );
+        epsilon = getEpsilon(episodeNum);
 
     }
 
@@ -103,20 +98,15 @@ public class AgentSiepie {
         network.load(path);
     }
 
-    // Getters for monitoring
-    public double getEpsilon() {
-        return epsilon;
-    }
-
-    public int getTotalSteps() {
-        return totalSteps;
-    }
-
-    public int getEpisodeCount() {
-        return episodeCount;
-    }
-
     public int getBufferSize() {
         return replayBuffer.getTotalSteps();
+    }
+
+    private double getEpsilon(int episode) {
+        if (episode > EPSILON_DECAY_EPISODES) {
+            return EPSILON_END;
+        }
+        double decay = (EPSILON_START - EPSILON_END) / EPSILON_DECAY_EPISODES;
+        return EPSILON_START - (episode * decay);
     }
 }

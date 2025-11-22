@@ -3,12 +3,12 @@ package nl.devc0n.machinelearning.siepie.model;
 import org.nd4j.linalg.api.ndarray.INDArray;
 
 public class GameStep {
-    private INDArray frameStack;
-    private Action action;
+    private final INDArray frameStack;
+    private final Action action;
     private float reward;
-    private INDArray nextFrameStack;
+    private final INDArray nextFrameStack;
     private boolean terminal;
-    private int stepNumber;
+    private final int stepNumber;
 
     public GameStep(INDArray frameStack, Action action, INDArray nextFrameStack, int stepNumber) {
         this.frameStack = frameStack;
@@ -20,12 +20,35 @@ public class GameStep {
     }
 
     // Getters and setters
-    public INDArray getFrameStack() { return frameStack; }
-    public Action getAction() { return action; }
-    public float getReward() { return reward; }
-    public void setReward(float reward) { this.reward = reward; }
-    public INDArray getNextFrameStack() { return nextFrameStack; }
-    public boolean isTerminal() { return terminal; }
-    public void setTerminal(boolean terminal) { this.terminal = terminal; }
-    public int getStepNumber() { return stepNumber; }
+    public INDArray getFrameStack() {
+        return frameStack;
+    }
+
+    public Action getAction() {
+        return action;
+    }
+
+    public float getReward() {
+        return reward;
+    }
+
+    public void setReward(float reward) {
+        this.reward = reward;
+    }
+
+    public INDArray getNextFrameStack() {
+        return nextFrameStack;
+    }
+
+    public boolean isTerminal() {
+        return terminal;
+    }
+
+    public void setTerminal(boolean terminal) {
+        this.terminal = terminal;
+    }
+
+    public int getStepNumber() {
+        return stepNumber;
+    }
 }
