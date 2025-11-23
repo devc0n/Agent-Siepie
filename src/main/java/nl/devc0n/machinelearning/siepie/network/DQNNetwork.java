@@ -21,9 +21,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-import static org.nd4j.graph.UIEventSubtype.LEARNING_RATE;
-
-
 public class DQNNetwork {
     private static final int INPUT_HEIGHT = 84;
     private static final int INPUT_WIDTH = 84;
@@ -42,7 +39,7 @@ public class DQNNetwork {
 
         var conf = new NeuralNetConfiguration.Builder()
                 .seed(123)
-                .updater(new Adam(LEARNING_RATE))
+                .updater(new Adam(0.00005))
                 .weightInit(WeightInit.XAVIER)
                 .gradientNormalization(GradientNormalization.ClipElementWiseAbsoluteValue)
                 .gradientNormalizationThreshold(1.0)

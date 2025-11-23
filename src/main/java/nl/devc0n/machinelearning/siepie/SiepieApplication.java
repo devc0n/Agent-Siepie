@@ -32,7 +32,7 @@ public class SiepieApplication {
 
 //       Optional: Load previous checkpoint
         try {
-            agent.load("fresh.zip");
+            agent.load("trained-start.zip");
             log.info("Starting from checkpoint");
         } catch (IOException e) {
             log.info("Starting fresh training");

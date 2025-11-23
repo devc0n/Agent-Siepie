@@ -20,7 +20,7 @@ public class AgentSiepie {
     // Training config
     private static final int BATCH_SIZE = 64;  // Was dit misschien 32?
     private static final int TRAIN_FREQUENCY = 50;  // Niet te vaak
-    private static final int TARGET_UPDATE_FREQUENCY = 2000;  // Terug naar origineel
+    private static final int TARGET_UPDATE_FREQUENCY = 1000;  // Terug naar origineel
     // Epsilon decay
     private static final double EPSILON_START = 0.30;
     private static final double EPSILON_END = 0.05;
@@ -102,11 +102,19 @@ public class AgentSiepie {
         return replayBuffer.getTotalSteps();
     }
 
+    // Override epsilon voor nieuwe exploration phase
     private double getEpsilon(int episode) {
-        if (episode > EPSILON_DECAY_EPISODES) {
-            return EPSILON_END;
+        //checkpoint 450
+        episode += 450;
+        // Episodes 450-650: boost exploration
+        if (episode >= 450 && episode < 650) {
+            return 0.25;  // Hoge exploratie
         }
-        double decay = (EPSILON_START - EPSILON_END) / EPSILON_DECAY_EPISODES;
-        return EPSILON_START - (episode * decay);
+        // Episodes 650-1000: decay terug naar laag
+        if (episode >= 650 && episode < 1000) {
+            double progress = (episode - 650) / 350.0;
+            return 0.25 - (progress * 0.20);  // 0.25 → 0.05
+        }
+        return 0.05;
     }
 }
